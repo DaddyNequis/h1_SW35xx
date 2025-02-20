@@ -1,8 +1,17 @@
 #include <Arduino.h>
+#include <SoftwareWire.h>
 #include <h1_SW35xx.h>
+#include "SoftwareWireWrapper.h"
+
+
 using namespace h1_SW35xx;
 
-SW35xx sw(Wire);
+// Create a SoftwareWire instance (choose your SDA and SCL pins)
+SoftwareWire softWire(2, 3);
+// Wrap the SoftwareWire instance
+SoftwareWireWrapper softWrapper(softWire);
+// Instantiate the SW35xx device with the wrapper
+SW35xx device(softWrapper);
 
 const char *fastChargeType2String(SW35xx::fastChargeType_t fastChargeType) {
   switch (fastChargeType) {
@@ -50,21 +59,16 @@ const char *fastChargeType2String(SW35xx::fastChargeType_t fastChargeType) {
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin(D1, D2); 
-  sw.setMaxCurrent5A();
+  softWrapper.begin(); // Initialize the SoftwareWire bus
+  device.begin();
+  Serial.println("SW35xx device initialized using SoftwareWire.");
 }
 
 void loop() {
-  sw.readStatus();
-  Serial.println("=======================================");
-  Serial.printf("Current input voltage:%dmV\n", sw.vin_mV);
-  Serial.printf("Current output voltage:%dmV\n", sw.vout_mV);
-  Serial.printf("Current USB-C current:%dmA\r\n", sw.iout_usbc_mA);
-  Serial.printf("Current USB-A current:%dmA\r\n", sw.iout_usba_mA);
-  Serial.printf("Current fast charge type:%s\n", fastChargeType2String(sw.fastChargeType));
-  if (sw.fastChargeType == SW35xx::PD_FIX || sw.fastChargeType == SW35xx::PD_PPS)
-    Serial.printf("Current PD version:%d\n", sw.PDVersion);
-  Serial.println("=======================================");
-  Serial.println("");
+  device.readStatus();
+  Serial.print("Input Voltage: ");
+  Serial.print(device.vin_mV);
+  Serial.println(" mV");
+  // … print other values as needed
   delay(2000);
 }

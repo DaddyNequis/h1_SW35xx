@@ -1,6 +1,6 @@
 #pragma once
 #include <stdint.h>
-#include <Wire.h>
+#include "I2CInterface.h"
 
 #ifndef BIT
 #define BIT(x) (1 << (x))
@@ -60,7 +60,7 @@ private:
     ADC_TEMPERATURE = 6,
   };
 
-  TwoWire &_i2c;
+  I2CInterface &_i2c;
 
   int i2cReadReg8(const uint8_t reg);
   int i2cWriteReg8(const uint8_t reg, const uint8_t data);
@@ -71,12 +71,12 @@ private:
   uint16_t readADCDataBuffer(const enum ADCDataType type);
 
 public:
-  SW35xx(TwoWire &i2c = Wire);
+  // Constructor now accepts any I2CInterface
+  SW35xx(I2CInterface &i2c);
   ~SW35xx();
   void begin();
   /**
    * @brief 读取当前充电状态
-   * 
    */
   void readStatus(const bool useADCDataBuffer=false);
   /**
@@ -85,7 +85,7 @@ public:
   float readTemperature(const bool useADCDataBuffer=false);
   /**
    * @brief 发送PD命令
-   * 
+   *
    * @note 这个芯片似乎可以发送很多种PD命令，但是寄存器文档里只有hardreset. 如果你有PD抓包工具，可以尝试2~15的不同参数，摸索出对应的命令。记得开个pr告诉我!
    */
   void sendPDCmd(PDCmd_t cmd);
@@ -105,33 +105,19 @@ public:
   void setMaxCurrent5A();
    /**
    * @brief 设置固定电压组别的最大输出电流
-   * 
+   *
    * @param ma_xx 各组别的最大输出电流,单位毫安,最小分度50ma,设为0则关闭
    * @note 5v无法关闭
    */
   void setMaxCurrentsFixed(uint32_t ma_5v, uint32_t ma_9v, uint32_t ma_12v, uint32_t ma_15v, uint32_t ma_20v);
   /**
    * @brief 设置PPS组别的最大输出电流
-   * 
+   *
    * @param ma_xxx 各组别最大输出电流,单位毫安,最小分度50ma,设为0则关闭
    * @note 注意 PD 配置的最大功率大于 60W 时, pps1 将不会广播 (TODO:datasheet这么写的，没试过)
    *       pps1 的最高电压需要大于 pps0 的最高电压，否则 pps1 不会广播;
    */
   void setMaxCurrentsPPS(uint32_t ma_pps1, uint32_t ma_pps2);
-  /**
-  //  * @brief 重置最大输出电流
-  //  * 
-  //  * @note 20v组别的电流不会被重置
-  //  */
-  // void resetMaxCurrents();
-  // /**
-  //  * @brief 启用Emarker检测
-  //  */
-  // void enableEmarker();
-  // /**
-  //  * @brief 禁用Emarker检测
-  //  */
-  // void disableEmarker();
 public:
   /**
    * @brief 输入电压
@@ -157,12 +143,6 @@ public:
    * @brief PD版本(2或者3)
    */
   uint8_t PDVersion;
-
-public:
-//TODO
-
-private:
-  bool _last_config_read_success;
 };
 
 } // namespace h1_SW35xx
