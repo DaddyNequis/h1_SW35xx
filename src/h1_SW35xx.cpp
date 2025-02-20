@@ -91,6 +91,8 @@ int SW35xx::i2cWriteReg8(const uint8_t reg, const uint8_t data) {
 }
 
 void SW35xx::begin(){
+  //Add delay to avoid I2C bus error
+    delay(100);
   // Enable voltage reading
   i2cWriteReg8(SW35XX_I2C_CTRL, 0x02);
 }
