@@ -40,7 +40,7 @@
 
 namespace h1_SW35xx {
 
-SW35xx::SW35xx(TwoWire &i2c) : _i2c(i2c) {}
+SW35xx::SW35xx(I2CInterface &i2c) : _i2c(i2c) {}
 SW35xx::~SW35xx() {}
 
 int SW35xx::i2cReadReg8(const uint8_t reg) {
@@ -57,7 +57,7 @@ int SW35xx::i2cReadReg8(const uint8_t reg) {
       continue;
     }
 
-    /* Wait until data is available if required */
+    // Wait until data is available if required
     for (int k=0; !_i2c.available() && k<I2C_RETRIES; k++) {
       delay(10);
     }
@@ -74,7 +74,6 @@ int SW35xx::i2cReadReg8(const uint8_t reg) {
 
 int SW35xx::i2cWriteReg8(const uint8_t reg, const uint8_t data) {
   int error = -1;
-
   for (int i=0; i<I2C_RETRIES; i++) {
     _i2c.beginTransmission(SW35XX_ADDRESS);
     if (_i2c.write(reg) != 1) {
@@ -88,21 +87,20 @@ int SW35xx::i2cWriteReg8(const uint8_t reg, const uint8_t data) {
       return 0;
     }
   }
-
   return error;
 }
 
 void SW35xx::begin(){
-  //启用输入电压读取
+  //Add delay to avoid I2C bus error
+    delay(100);
+  // Enable voltage reading
   i2cWriteReg8(SW35XX_I2C_CTRL, 0x02);
 }
 
 uint16_t SW35xx::readADCDataBuffer(const enum ADCDataType type) {
   i2cWriteReg8(SW35XX_ADC_DATA_TYPE, type);
-
   uint16_t value = i2cReadReg8(SW35XX_ADC_DATA_BUF_H) << 4;
   value |= i2cReadReg8(SW35XX_ADC_DATA_BUF_L) | 0x0f;
-
   return value;
 }
 
@@ -113,13 +111,13 @@ void SW35xx::readStatus(const bool useADCDataBuffer) {
   uint16_t iout_usba = 0;
 
   if (useADCDataBuffer) {
-    //读取输入电压
+    // Read input voltage
     vin = readADCDataBuffer(ADC_VIN);
-    //读取输出电压
+    // Read output voltage
     vout = readADCDataBuffer(ADC_VOUT);
-    //读取接口1输出电流
+    // Read USB-C output current
     iout_usbc = readADCDataBuffer(ADC_IOUT_USB_C);
-    //读取接口2输出电流
+    // Read USB-A output current
     iout_usba = readADCDataBuffer(ADC_IOUT_USB_A);
   } else {
     const uint8_t vin_vout_low = i2cReadReg8(SW35XX_ADC_VIN_VOUT_L);
@@ -137,7 +135,7 @@ void SW35xx::readStatus(const bool useADCDataBuffer) {
 
   vin_mV = vin * 10;
   vout_mV = vout * 6;
-  if (iout_usbc > 15) //在没有输出的情况下读到的数据是15
+  if (iout_usbc > 15)
     iout_usbc_mA = iout_usbc * 5 / 2;
   else
     iout_usbc_mA = 0;
@@ -146,7 +144,8 @@ void SW35xx::readStatus(const bool useADCDataBuffer) {
     iout_usba_mA = iout_usba * 5 / 2;
   else
     iout_usba_mA = 0;
-  //读取pd版本和快充协议
+  
+  // Read PD version and fast charge protocol
   const uint8_t status = i2cReadReg8(SW35XX_FCX_STATUS);
   PDVersion = ((status & 0x30) >> 4) + 1;
   fastChargeType = (fastChargeType_t)(status & 0x0f);
@@ -154,15 +153,12 @@ void SW35xx::readStatus(const bool useADCDataBuffer) {
 
 float SW35xx::readTemperature(const bool useADCDataBuffer) {
   uint16_t temperature = 0;
-
   if (useADCDataBuffer) {
     temperature = readADCDataBuffer(ADC_TEMPERATURE);
   } else {
     temperature = i2cReadReg8(SW35XX_ADC_TS_H) << 4;
     temperature |= i2cReadReg8(SW35XX_ADC_TS_L) & 0x0F;
   }
-
-  /* return it in mV */
   return temperature * 0.5;
 }
 
@@ -198,12 +194,10 @@ void SW35xx::setMaxCurrent5A() {
 
 void SW35xx::setQuickChargeConfiguration(const uint16_t flags,
     const enum QuickChargePowerClass power) {
-  /* mask all available bits to avoid setting reserved bits */
   const uint16_t validFlags = flags & QC_CONF_ALL;
   const uint16_t validPower = power & QC_PWR_20V_2;
   const uint8_t conf1 = validFlags;
   const uint8_t conf2 = (validFlags >> 8) | (validPower << 2);
-
   unlock_i2c_write();
   i2cWriteReg8(SW35XX_QC_CONF1, conf1);
   i2cWriteReg8(SW35XX_QC_CONF2, conf2);
@@ -242,7 +236,6 @@ void SW35xx::setMaxCurrentsFixed(uint32_t ma_5v, uint32_t ma_9v, uint32_t ma_12v
   unlock_i2c_write();
 
   i2cWriteReg8(SW35XX_PD_CONF8, tmp);
-
   i2cWriteReg8(SW35XX_PD_CONF1, ma_5v/50);
   i2cWriteReg8(SW35XX_PD_CONF2, ma_9v/50);
   i2cWriteReg8(SW35XX_PD_CONF3, ma_12v/50);
@@ -250,7 +243,6 @@ void SW35xx::setMaxCurrentsFixed(uint32_t ma_5v, uint32_t ma_9v, uint32_t ma_12v
   i2cWriteReg8(SW35XX_PD_CONF5, ma_20v/50);
 
   lock_i2c_write();
-
 }
 
 void SW35xx::setMaxCurrentsPPS(uint32_t ma_pps1, uint32_t ma_pps2) {
@@ -270,14 +262,10 @@ void SW35xx::setMaxCurrentsPPS(uint32_t ma_pps1, uint32_t ma_pps2) {
   else
     tmp |= 0b10000000;
   
-  
   unlock_i2c_write();
-
   i2cWriteReg8(SW35XX_PD_CONF8, tmp);
-
   i2cWriteReg8(SW35XX_PD_CONF6, ma_pps1/50);
   i2cWriteReg8(SW35XX_PD_CONF7, ma_pps2/50);
-
   lock_i2c_write();
 }
 
